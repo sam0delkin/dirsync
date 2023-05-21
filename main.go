@@ -88,7 +88,7 @@ func processChange(changeType ChangeType, path string) {
 			log.Infoln("[INIT] Copying ", alphaPath, betaPath)
 			command := "rm -rf " + betaPath + " && cp -rf -p " + alphaPath + " " + betaPath + " && chown -R " + args.BetaOwner + " " + betaPath
 			log.Debugln("[INIT] Command ", command)
-			_, err := exec.Command("bash", "-c", command).Output()
+			_, err := exec.Command("sh", "-c", command).Output()
 			if err != nil {
 				log.Errorln("Failed to copy file from alpha to beta: ", command, err)
 			}
@@ -96,7 +96,7 @@ func processChange(changeType ChangeType, path string) {
 			log.Infoln("[INIT] Removing ", betaPath)
 			command := "rm -rf " + betaPath
 			log.Debugln("[INIT] Command ", command)
-			_, err := exec.Command("bash", "-c", command).Output()
+			_, err := exec.Command("sh", "-c", command).Output()
 			if err != nil {
 				log.Errorln("Failed to remove file from beta: ", command, err)
 			}
@@ -104,7 +104,7 @@ func processChange(changeType ChangeType, path string) {
 			log.Infoln("[INIT] Copying ", alphaPath, betaPath)
 			command := "rm -rf " + betaPath + " && cp  -rf -p " + alphaPath + " " + betaPath + " && chown -R " + args.BetaOwner + " " + betaPath
 			log.Debugln("[INIT] Command ", command)
-			_, err := exec.Command("bash", "-c", command).Output()
+			_, err := exec.Command("sh", "-c", command).Output()
 			if err != nil {
 				log.Errorln("Failed to copy file from alpha to beta: ", command, err)
 			}
@@ -119,14 +119,14 @@ func processChange(changeType ChangeType, path string) {
 				if info.IsDir() {
 					command := "mkdir --parents " + betaPath
 					log.Debugln("[CREATE] Command ", command)
-					_, err := exec.Command("bash", "-c", command).Output()
+					_, err := exec.Command("sh", "-c", command).Output()
 					if err != nil {
 						log.Errorln("Failed to copy file from alpha to beta: ", command, err)
 					}
 				} else {
 					command := "cp -f -p " + alphaPath + " " + betaPath + " && chown -R " + args.BetaOwner + " " + betaPath
 					log.Debugln("[CREATE] Command ", command)
-					_, err = exec.Command("bash", "-c", command).Output()
+					_, err = exec.Command("sh", "-c", command).Output()
 					if err != nil {
 						log.Errorln("Failed to copy file from alpha to beta: ", command, err)
 					}
@@ -141,14 +141,14 @@ func processChange(changeType ChangeType, path string) {
 				if info.IsDir() {
 					command := "mkdir --parents " + alphaPath
 					log.Debugln("[CREATE] Command ", command)
-					_, err := exec.Command("bash", "-c", command).Output()
+					_, err := exec.Command("sh", "-c", command).Output()
 					if err != nil {
 						log.Errorln("Failed to copy file from alpha to beta: ", command, err)
 					}
 				} else {
 					command := "cp -f -p " + betaPath + " " + alphaPath + " && chown -R " + args.AlphaOwner + " " + alphaPath
 					log.Debugln("[CREATE] Command ", command)
-					_, err = exec.Command("bash", "-c", command).Output()
+					_, err = exec.Command("sh", "-c", command).Output()
 					if err != nil {
 						log.Errorln("Failed to copy file from alpha to beta: ", command, err)
 					}
@@ -172,7 +172,7 @@ func processChange(changeType ChangeType, path string) {
 		if alphaInfo.IsDir() || betaInfo.IsDir() {
 			command := "touch " + betaPath + " && touch " + alphaPath
 			log.Debugln("[MODIFY] Command ", command)
-			_, err := exec.Command("bash", "-c", command).Output()
+			_, err := exec.Command("sh", "-c", command).Output()
 			if err != nil {
 				log.Errorln("Failed to modify mtime of dir: ", command, err)
 
@@ -186,7 +186,7 @@ func processChange(changeType ChangeType, path string) {
 			log.Infoln("[MODIFY] Modifying from source to target ", alphaPath, betaPath)
 			command := "cp -f -p " + alphaPath + " " + betaPath + " && chown -R " + args.BetaOwner + " " + betaPath
 			log.Debugln("[MODIFY] Command ", command)
-			_, err = exec.Command("bash", "-c", command).Output()
+			_, err = exec.Command("sh", "-c", command).Output()
 			if err != nil {
 				log.Errorln("Failed to copy file from alpha to beta: ", command, err)
 			}
@@ -194,7 +194,7 @@ func processChange(changeType ChangeType, path string) {
 			log.Infoln("[MODIFY] Modifying from source to target ", alphaPath, betaPath)
 			command := "cp -f -p " + betaPath + " " + alphaPath + " && chown -R " + args.AlphaOwner + " " + alphaPath
 			log.Debugln("[MODIFY] Command ", command)
-			_, err = exec.Command("bash", "-c", command).Output()
+			_, err = exec.Command("sh", "-c", command).Output()
 			if err != nil {
 				log.Errorln("Failed to copy file from alpha to beta: ", command, err)
 			}
@@ -215,7 +215,7 @@ func processChange(changeType ChangeType, path string) {
 			log.Infoln("[REMOVE] Removing ", alphaPath)
 			command := "rm -rf " + alphaPath
 			log.Debugln("[REMOVE] Command ", command)
-			_, err := exec.Command("bash", "-c", command).Output()
+			_, err := exec.Command("sh", "-c", command).Output()
 			if err != nil {
 				log.Errorln("Failed to remove file from alpha to beta: ", command, err)
 			}
@@ -223,7 +223,7 @@ func processChange(changeType ChangeType, path string) {
 			log.Infoln("[REMOVE] Removing ", betaPath)
 			command := "rm -rf " + betaPath
 			log.Debugln("[REMOVE] Command ", command)
-			_, err := exec.Command("bash", "-c", command).Output()
+			_, err := exec.Command("sh", "-c", command).Output()
 			if err != nil {
 				log.Errorln("Failed to remove file: ", command, err)
 			}
@@ -242,7 +242,7 @@ func getPathsInfo(path string, includeMtime bool) []string {
 	}
 	var command = fmt.Sprintf("cd %s && du -a %s | awk '{print $2}' | xargs realpath | xargs  stat -c \"%%n %%Y\" 2>&1 || true", path, ignores)
 	log.Debugln("[PATH_INFO] Command", command)
-	out, err := exec.Command("bash", "-c", command).Output()
+	out, err := exec.Command("sh", "-c", command).Output()
 	if err != nil {
 		log.Fatal("Can't execute ls. Exiting. Error: ", err)
 		os.Exit(1)
@@ -279,7 +279,7 @@ func getPathHash(path string) string {
 	}
 	var command = fmt.Sprintf("(cd %s && du -a %s | awk '{print $2}' | xargs realpath | xargs stat -c \"%%n %%Y\" 2>&1 || true) | sha256sum", path, ignores)
 	log.Debugln("[PATH_INFO] Command", command)
-	out, err := exec.Command("bash", "-c", command).Output()
+	out, err := exec.Command("sh", "-c", command).Output()
 	if err != nil {
 		log.Fatal("Can't execute ls. Exiting. Error: ", err)
 		os.Exit(1)

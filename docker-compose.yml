@@ -3,7 +3,7 @@ version: '2'
 services:
   app:
     build: .
-    entrypoint: "bash -c \"while [[ true ]]; do sleep 1; done\""
+    entrypoint: "sh -c \"while [ true ]; do sleep 1; done\""
     privileged: true
     cap_add:
       - CAP_SYS_ADMIN

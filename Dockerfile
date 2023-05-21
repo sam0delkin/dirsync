@@ -1,4 +1,4 @@
-FROM golang
+FROM golang:alpine AS builder
 
 RUN mkdir "/build"
 
@@ -9,6 +9,8 @@ WORKDIR /build
 RUN go build -o dirsync
 RUN chmod +x dirsync
 
-RUN cp dirsync /usr/local/bin/dirsync
+FROM alpine
+
+COPY --from=builder /build/dirsync /usr/local/bin/dirsync
 
 ENTRYPOINT dirsync

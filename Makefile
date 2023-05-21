@@ -9,7 +9,7 @@ export
 .PHONY: .help
 
 build:
-	docker build --push -t sam0delkin/dirsync:latest -f Dockerfile .
+	docker build -t sam0delkin/dirsync:latest -f Dockerfile .
 
 
 build_multi_arch:

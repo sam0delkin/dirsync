@@ -1,0 +1,25 @@
+version: '2'
+
+services:
+  app:
+    build: .
+    entrypoint: "bash -c \"while [[ true ]]; do sleep 1; done\""
+    privileged: true
+    cap_add:
+      - CAP_SYS_ADMIN
+      - CAP_DAC_READ_SEARCH
+    volumes:
+      - .:/alpha
+      - /beta
+#      - gamma:/gamma
+    environment:
+      - CONFIG_FILE_PATH=/alpha/config.json
+
+
+#volumes:
+#  gamma:
+#    driver: local
+#    driver_opts:
+#      type: nfs
+#      o: addr=host.internal,rw,nolock,hard,nointr,async,fsc,proto=udp,mountproto=udp,nfsvers=3
+#      device: ":/System/Volumes/Data/Users/sam0delkin/Work/my-projects/go/fanotify-dir-sync"

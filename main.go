@@ -18,7 +18,6 @@ import (
 )
 
 var initCompleted = false
-var eventsEnabled = true
 
 type ChangeType int
 
@@ -63,12 +62,9 @@ func processChange(changeType ChangeType, path string) {
 		return
 	}
 
-	var mutex = sync.Mutex{}
 	var alphaPath = args.Alpha + path
 	var betaPath = args.Beta + path
 	var alphaExists, betaExists bool
-
-	mutex.Lock()
 
 	if _, err := os.Stat(alphaPath); err == nil {
 		alphaExists = true
@@ -229,8 +225,6 @@ func processChange(changeType ChangeType, path string) {
 			}
 		}
 	}
-
-	mutex.Unlock()
 }
 
 func getPathsInfo(path string, includeMtime bool) []string {
@@ -456,24 +450,20 @@ func initFsNotifyWatcher() {
 					return
 				}
 				if initCompleted {
-					if eventsEnabled {
-						eventsEnabled = false
-						log.Debugln("[fsnotify] event:", event)
-						log.Debugln("[fsnotify] event:", event.Op.String())
-						var path = strings.Replace(strings.Replace(event.Name, args.Alpha, "", 1), args.Beta, "", 1)
+					log.Debugln("[fsnotify] event:", event)
+					log.Debugln("[fsnotify] event:", event.Op.String())
+					var path = strings.Replace(strings.Replace(event.Name, args.Alpha, "", 1), args.Beta, "", 1)
 
-						if strings.Index(event.Op.String(), "CREATE") >= 0 {
-							processChange(CreateChangeType, path)
-						}
+					if strings.Index(event.Op.String(), "CREATE") >= 0 {
+						processChange(CreateChangeType, path)
+					}
 
-						if strings.Index(event.Op.String(), "WRITE") >= 0 {
-							processChange(ModifyChangeType, path)
-						}
+					if strings.Index(event.Op.String(), "WRITE") >= 0 {
+						processChange(ModifyChangeType, path)
+					}
 
-						if strings.Index(event.Op.String(), "REMOVE") >= 0 {
-							processChange(RemoveChangeType, path)
-						}
-						eventsEnabled = true
+					if strings.Index(event.Op.String(), "REMOVE") >= 0 {
+						processChange(RemoveChangeType, path)
 					}
 				}
 			case err, ok := <-watcher.Errors:

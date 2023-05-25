@@ -1,3 +1,7 @@
+FROM golang AS debug
+
+WORKDIR /alpha
+
 FROM golang:alpine AS builder
 
 RUN mkdir "/build"

@@ -211,7 +211,7 @@ func processChange(changeType ChangeType, path string) {
 			log.Debugln("[REMOVE] Beta not exists", betaPath)
 		}
 
-		if !betaExists {
+		if !betaExists && alphaExists {
 			log.Infoln("[REMOVE] Removing ", alphaPath)
 			command := "rm -rf " + alphaPath
 			log.Debugln("[REMOVE] Command ", command)
@@ -219,7 +219,7 @@ func processChange(changeType ChangeType, path string) {
 			if err != nil {
 				log.Errorln("Failed to remove file from alpha to beta: ", command, err)
 			}
-		} else if !alphaExists {
+		} else if !alphaExists && betaExists {
 			log.Infoln("[REMOVE] Removing ", betaPath)
 			command := "rm -rf " + betaPath
 			log.Debugln("[REMOVE] Command ", command)
@@ -520,30 +520,59 @@ func initFsNotifyWatcher() {
 }
 
 func initFaNotifyWatcher() {
-	listener, err := fanotify.NewListener(args.Alpha, true, fanotify.PermissionNone)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+	if args.WatchAlpha {
+		alphaListener, err := fanotify.NewListener(args.Alpha, false, fanotify.PermissionNone)
+		if err != nil {
+			log.Fatal("[fanotify] Can't init:", err)
+			os.Exit(1)
+		}
+		log.Infoln("[fanotify] Listening to events for:", args.Alpha)
+		var eventTypes fanotify.EventType
+		eventTypes = fanotify.FileModified |
+			fanotify.FileCreated |
+			fanotify.FileOrDirectoryCreated |
+			fanotify.FileDeleted |
+			fanotify.FileOrDirectoryDeleted
+		log.Debugln("[fanotify] Listening on the event mask %x\n", uint64(eventTypes))
+		err = alphaListener.AddWatch(args.Alpha, eventTypes)
+		if err != nil {
+			log.Fatal("[fanotify] WatchMount:", err)
+			os.Exit(1)
+		}
+		go alphaListener.Start()
+		for event := range alphaListener.Events {
+			fmt.Println(event)
+			unix.Close(event.Fd)
+		}
+		alphaListener.Stop()
 	}
-	fmt.Println("[fanotify] Listening to events for:", args.Alpha)
-	var eventTypes fanotify.EventType
-	eventTypes = fanotify.FileModified |
-		fanotify.FileCreated |
-		fanotify.FileOrDirectoryCreated |
-		fanotify.FileDeleted |
-		fanotify.FileOrDirectoryDeleted
-	fmt.Printf("Listening on the event mask %x\n", uint64(eventTypes))
-	err = listener.WatchMount(eventTypes)
-	if err != nil {
-		fmt.Println("WatchMount:", err)
-		os.Exit(1)
+
+	if args.WatchBeta {
+		alphaListener, err := fanotify.NewListener(args.Beta, false, fanotify.PermissionNone)
+		if err != nil {
+			log.Fatal("[fanotify] Can't init:", err)
+			os.Exit(1)
+		}
+		log.Infoln("[fanotify] Listening to events for:", args.Beta)
+		var eventTypes fanotify.EventType
+		eventTypes = fanotify.FileModified |
+			fanotify.FileCreated |
+			fanotify.FileOrDirectoryCreated |
+			fanotify.FileDeleted |
+			fanotify.FileOrDirectoryDeleted
+		log.Debugln("[fanotify] Listening on the event mask %x\n", uint64(eventTypes))
+		err = alphaListener.AddWatch(args.Beta, eventTypes)
+		if err != nil {
+			log.Fatal("[fanotify] WatchMount:", err)
+			os.Exit(1)
+		}
+		go alphaListener.Start()
+		for event := range alphaListener.Events {
+			fmt.Println(event)
+			unix.Close(event.Fd)
+		}
+		alphaListener.Stop()
 	}
-	go listener.Start()
-	for event := range listener.Events {
-		fmt.Println(event)
-		unix.Close(event.Fd)
-	}
-	listener.Stop()
 }
 
 func main() {

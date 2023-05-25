@@ -110,7 +110,7 @@ func processChange(changeType ChangeType, path string) {
 			}
 		}
 	case CreateChangeType:
-		if !betaExists {
+		if !betaExists && args.WatchAlpha {
 			info, err := os.Stat(alphaPath)
 			if err != nil {
 				log.Errorln("Failed to get file stat: ", err)
@@ -132,7 +132,7 @@ func processChange(changeType ChangeType, path string) {
 					}
 				}
 			}
-		} else if !alphaExists {
+		} else if !alphaExists && args.WatchBeta {
 			info, err := os.Stat(betaPath)
 			if err != nil {
 				log.Debugln("Failed to get file stat: ", err)
@@ -182,7 +182,7 @@ func processChange(changeType ChangeType, path string) {
 			return
 		}
 
-		if alphaInfo.ModTime().UnixMicro() > betaInfo.ModTime().UnixMicro() {
+		if alphaInfo.ModTime().UnixMicro() > betaInfo.ModTime().UnixMicro() && args.WatchAlpha {
 			log.Infoln("[MODIFY] Modifying from source to target ", alphaPath, betaPath)
 			command := "cp -f -p " + alphaPath + " " + betaPath + " && chown -R " + args.BetaOwner + " " + betaPath
 			log.Debugln("[MODIFY] Command ", command)
@@ -190,7 +190,7 @@ func processChange(changeType ChangeType, path string) {
 			if err != nil {
 				log.Errorln("Failed to copy file from alpha to beta: ", command, err)
 			}
-		} else if alphaInfo.ModTime().UnixMicro() < betaInfo.ModTime().UnixMicro() {
+		} else if alphaInfo.ModTime().UnixMicro() < betaInfo.ModTime().UnixMicro() && args.WatchBeta {
 			log.Infoln("[MODIFY] Modifying from source to target ", alphaPath, betaPath)
 			command := "cp -f -p " + betaPath + " " + alphaPath + " && chown -R " + args.AlphaOwner + " " + alphaPath
 			log.Debugln("[MODIFY] Command ", command)
@@ -211,7 +211,7 @@ func processChange(changeType ChangeType, path string) {
 			log.Debugln("[REMOVE] Beta not exists", betaPath)
 		}
 
-		if !betaExists && alphaExists {
+		if !betaExists && alphaExists && args.WatchBeta {
 			log.Infoln("[REMOVE] Removing ", alphaPath)
 			command := "rm -rf " + alphaPath
 			log.Debugln("[REMOVE] Command ", command)
@@ -219,7 +219,7 @@ func processChange(changeType ChangeType, path string) {
 			if err != nil {
 				log.Errorln("Failed to remove file from alpha to beta: ", command, err)
 			}
-		} else if !alphaExists && betaExists {
+		} else if !alphaExists && betaExists && args.WatchAlpha {
 			log.Infoln("[REMOVE] Removing ", betaPath)
 			command := "rm -rf " + betaPath
 			log.Debugln("[REMOVE] Command ", command)

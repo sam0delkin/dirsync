@@ -16,6 +16,8 @@ github.com/opcoder0/capabilities v0.0.0-20221222060822-17fd73bffd2a h1:sbMMqulR2
 github.com/opcoder0/capabilities v0.0.0-20221222060822-17fd73bffd2a/go.mod h1:77JxdABQ4m37PtO4WMtRBrI+DDphomu/8tGeijYXspk=
 github.com/opcoder0/fanotify v0.4.2 h1:Bp7h8scp/LNoWmC16Z1kf7GfxehhQLcDPxqJ31+SThs=
 github.com/opcoder0/fanotify v0.4.2/go.mod h1:S0LITNqjkZwifQ+0qB1fT1S/SmDmnFH+h0SLBzoKW2Q=
+github.com/phf/go-queue v0.0.0-20170504031614-9abe38d0371d h1:U+PMnTlV2tu7RuMK5etusZG3Cf+rpow5hqQByeCzJ2g=
+github.com/phf/go-queue v0.0.0-20170504031614-9abe38d0371d/go.mod h1:lXfE4PvvTW5xOjO6Mba8zDPyw8M93B6AQ7frTGnMlA8=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/sirupsen/logrus v1.9.2 h1:oxx1eChJGI6Uks2ZC4W1zpLlVgqB8ner4EuQwV4Ik1Y=

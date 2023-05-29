@@ -9,15 +9,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 )
-
-var initCompleted = false
 
 type ChangeType int
 
@@ -33,7 +29,8 @@ var args struct {
 	Beta         string   `arg:"env:BETA,positional,required" help:"Target sync directory"`
 	Exclude      []string `arg:"-e,env:EXCLUDES" help:"Exclude paths from sync and watch"`
 	PollEnabled  bool     `arg:"-p,env:POLL_ENABLED" help:"Enable polling for new changes"`
-	PollInterval int      `arg:"-i,env:POLL_INTERVAL" default:"1" help:"Polling interval"`
+	PollInterval int      `arg:"-i,env:POLL_INTERVAL" default:"1" help:"Polling interval (seconds)"`
+	SyncInterval int      `arg:"-s,env:SYNC_INTERVAL" default:"100" help:"Sync changes interval (milliseconds)"`
 	LogLevel     string   `arg:"-l,env:LOG_LEVEL" default:"error" help:"Logging level [error|info|debug]"`
 	AlphaOwner   string   `arg:"-A,env:ALPHA_OWNER" default:"root" help:"Owner of the files in source sync directory"`
 	BetaOwner    string   `arg:"-B,env:BETA_OWNER" default:"root" help:"Owner of the files in target sync directory"`
@@ -43,289 +40,7 @@ var args struct {
 	InitDir      bool     `arg:"env:INIT_DIR" help:"Init target directory from source on start"`
 }
 
-func isIgnored(path string, logging bool) bool {
-	for _, exclude := range args.Exclude {
-		if (0 == strings.Index(path, exclude)) || (0 == strings.Index(path, "/"+exclude)) {
-			if logging {
-				log.Infoln("Ignoring path: ", path)
-			}
-
-			return true
-		}
-	}
-
-	return false
-}
-
-func processChange(changeType ChangeType, path string) {
-	if isIgnored(path, true) {
-		return
-	}
-
-	var alphaPath = args.Alpha + path
-	var betaPath = args.Beta + path
-	var alphaExists, betaExists bool
-
-	if _, err := os.Stat(alphaPath); err == nil {
-		alphaExists = true
-	} else {
-		alphaExists = false
-	}
-
-	if _, err := os.Stat(betaPath); err == nil {
-		betaExists = true
-	} else {
-		betaExists = false
-	}
-	switch changeType {
-	case InitChangeType:
-		// alpha always wins
-		if !betaExists {
-			log.Infoln("[INIT] Copying ", alphaPath, betaPath)
-			command := "rm -rf " + betaPath + " && cp -rf -p " + alphaPath + " " + betaPath + " && chown -R " + args.BetaOwner + " " + betaPath
-			log.Debugln("[INIT] Command ", command)
-			_, err := exec.Command("sh", "-c", command).Output()
-			if err != nil {
-				log.Errorln("Failed to copy file from alpha to beta: ", command, err)
-			}
-		} else if !alphaExists {
-			log.Infoln("[INIT] Removing ", betaPath)
-			command := "rm -rf " + betaPath
-			log.Debugln("[INIT] Command ", command)
-			_, err := exec.Command("sh", "-c", command).Output()
-			if err != nil {
-				log.Errorln("Failed to remove file from beta: ", command, err)
-			}
-		} else {
-			log.Infoln("[INIT] Copying ", alphaPath, betaPath)
-			command := "rm -rf " + betaPath + " && cp  -rf -p " + alphaPath + " " + betaPath + " && chown -R " + args.BetaOwner + " " + betaPath
-			log.Debugln("[INIT] Command ", command)
-			_, err := exec.Command("sh", "-c", command).Output()
-			if err != nil {
-				log.Errorln("Failed to copy file from alpha to beta: ", command, err)
-			}
-		}
-	case CreateChangeType:
-		if !betaExists && args.WatchAlpha {
-			info, err := os.Stat(alphaPath)
-			if err != nil {
-				log.Errorln("Failed to get file stat: ", err)
-			} else {
-				log.Infoln("[CREATE] Copying ", alphaPath, betaPath)
-				if info.IsDir() {
-					command := "mkdir --parents " + betaPath
-					log.Debugln("[CREATE] Command ", command)
-					_, err := exec.Command("sh", "-c", command).Output()
-					if err != nil {
-						log.Errorln("Failed to copy file from alpha to beta: ", command, err)
-					}
-				} else {
-					command := "cp -f -p " + alphaPath + " " + betaPath + " && chown -R " + args.BetaOwner + " " + betaPath
-					log.Debugln("[CREATE] Command ", command)
-					_, err = exec.Command("sh", "-c", command).Output()
-					if err != nil {
-						log.Errorln("Failed to copy file from alpha to beta: ", command, err)
-					}
-				}
-			}
-		} else if !alphaExists && args.WatchBeta {
-			info, err := os.Stat(betaPath)
-			if err != nil {
-				log.Debugln("Failed to get file stat: ", err)
-			} else {
-				log.Infoln("[CREATE] Copying ", betaPath, alphaPath)
-				if info.IsDir() {
-					command := "mkdir --parents " + alphaPath
-					log.Debugln("[CREATE] Command ", command)
-					_, err := exec.Command("sh", "-c", command).Output()
-					if err != nil {
-						log.Errorln("Failed to copy file from alpha to beta: ", command, err)
-					}
-				} else {
-					command := "cp -f -p " + betaPath + " " + alphaPath + " && chown -R " + args.AlphaOwner + " " + alphaPath
-					log.Debugln("[CREATE] Command ", command)
-					_, err = exec.Command("sh", "-c", command).Output()
-					if err != nil {
-						log.Errorln("Failed to copy file from alpha to beta: ", command, err)
-					}
-				}
-			}
-		}
-	case ModifyChangeType:
-		alphaInfo, err := os.Stat(alphaPath)
-		if err != nil {
-			log.Errorln("Failed to get file stat: ", err)
-
-			return
-		}
-		betaInfo, err := os.Stat(betaPath)
-		if err != nil {
-			log.Debugln("Failed to get file stat: ", err)
-
-			return
-		}
-
-		if alphaInfo.IsDir() || betaInfo.IsDir() {
-			command := "touch " + betaPath + " && touch " + alphaPath
-			log.Debugln("[MODIFY] Command ", command)
-			_, err := exec.Command("sh", "-c", command).Output()
-			if err != nil {
-				log.Errorln("Failed to modify mtime of dir: ", command, err)
-
-				return
-			}
-
-			return
-		}
-
-		if alphaInfo.ModTime().UnixMicro() > betaInfo.ModTime().UnixMicro() && args.WatchAlpha {
-			log.Infoln("[MODIFY] Modifying from source to target ", alphaPath, betaPath)
-			command := "cp -f -p " + alphaPath + " " + betaPath + " && chown -R " + args.BetaOwner + " " + betaPath
-			log.Debugln("[MODIFY] Command ", command)
-			_, err = exec.Command("sh", "-c", command).Output()
-			if err != nil {
-				log.Errorln("Failed to copy file from alpha to beta: ", command, err)
-			}
-		} else if alphaInfo.ModTime().UnixMicro() < betaInfo.ModTime().UnixMicro() && args.WatchBeta {
-			log.Infoln("[MODIFY] Modifying from source to target ", alphaPath, betaPath)
-			command := "cp -f -p " + betaPath + " " + alphaPath + " && chown -R " + args.AlphaOwner + " " + alphaPath
-			log.Debugln("[MODIFY] Command ", command)
-			_, err = exec.Command("sh", "-c", command).Output()
-			if err != nil {
-				log.Errorln("Failed to copy file from alpha to beta: ", command, err)
-			}
-		}
-	case RemoveChangeType:
-		if alphaExists {
-			log.Debugln("[REMOVE] Alpha exists", alphaPath)
-		} else {
-			log.Debugln("[REMOVE] Alpha not exists", alphaPath)
-		}
-		if betaExists {
-			log.Debugln("[REMOVE] Beta exists", betaPath)
-		} else {
-			log.Debugln("[REMOVE] Beta not exists", betaPath)
-		}
-
-		if !betaExists && alphaExists && args.WatchBeta {
-			log.Infoln("[REMOVE] Removing ", alphaPath)
-			command := "rm -rf " + alphaPath
-			log.Debugln("[REMOVE] Command ", command)
-			_, err := exec.Command("sh", "-c", command).Output()
-			if err != nil {
-				log.Errorln("Failed to remove file from alpha to beta: ", command, err)
-			}
-		} else if !alphaExists && betaExists && args.WatchAlpha {
-			log.Infoln("[REMOVE] Removing ", betaPath)
-			command := "rm -rf " + betaPath
-			log.Debugln("[REMOVE] Command ", command)
-			_, err := exec.Command("sh", "-c", command).Output()
-			if err != nil {
-				log.Errorln("Failed to remove file: ", command, err)
-			}
-		}
-	}
-}
-
-func getPathsInfo(path string, includeMtime bool) []string {
-	var paths = []string{}
-	var ignores = ""
-
-	for _, exclude := range args.Exclude {
-		ignores += fmt.Sprintf(" --exclude \"%s/%s*\" ", path, exclude)
-	}
-	var command = fmt.Sprintf("cd %s && du -a %s | awk '{print $2}' | xargs realpath | xargs  stat -c \"%%n %%Y\" 2>&1 || true", path, ignores)
-	log.Debugln("[PATH_INFO] Command", command)
-	out, err := exec.Command("sh", "-c", command).Output()
-	if err != nil {
-		log.Fatal("Can't execute ls. Exiting. Error: ", err)
-		os.Exit(1)
-	}
-	var outStrings = strings.Split(string(out), "\n")
-	for _, s := range outStrings {
-		var pathParts = strings.Split(s, " ")
-
-		if len(pathParts) < 2 {
-			continue
-		}
-
-		pathParts[0] = strings.Replace(pathParts[0], path, "", 1)
-		var newPathParts []string
-		if includeMtime {
-			newPathParts = []string{pathParts[0], pathParts[1]}
-		} else {
-			newPathParts = []string{pathParts[0]}
-		}
-		s = strings.Join(newPathParts, " ")
-		paths = append(paths, s)
-	}
-
-	sort.Strings(paths)
-
-	return paths
-}
-
-func getPathHash(path string) string {
-	var ignores = ""
-
-	for _, exclude := range args.Exclude {
-		ignores += fmt.Sprintf(" --exclude \"%s/%s*\" ", path, exclude)
-	}
-	var command = fmt.Sprintf("(cd %s && du -a %s | awk '{print $2}' | xargs realpath | xargs stat -c \"%%n %%Y\" 2>&1 || true) | sha256sum", path, ignores)
-	log.Debugln("[PATH_INFO] Command", command)
-	out, err := exec.Command("sh", "-c", command).Output()
-	if err != nil {
-		log.Fatal("Can't execute ls. Exiting. Error: ", err)
-		os.Exit(1)
-	}
-
-	return string(out)
-}
-
-func initDir() {
-	log.Debugln("First run. Checking whole directory structure")
-	var alphaPaths = getPathsInfo(args.Alpha, true)
-	var betaPaths = getPathsInfo(args.Beta, true)
-	var diff []string
-
-	if len(betaPaths) > 1 {
-		diffA := arrutil.Differences(alphaPaths, betaPaths, func(a, b any) int {
-			return strings.Compare(a.(string), b.(string))
-		})
-		diffB := arrutil.Differences(betaPaths, alphaPaths, func(a, b any) int {
-			return strings.Compare(a.(string), b.(string))
-		})
-
-		diff = arrutil.Unique(append(diffA, diffB...))
-	} else {
-		diff = alphaPaths
-	}
-
-	log.Debugln("Found following diffs", diff)
-	var processedPaths []string
-
-	for _, s := range diff {
-		path := strings.Split(s, " ")[0]
-		var pathProcessed = false
-
-		for _, pp := range processedPaths {
-			if strings.Index(path, pp) >= 0 {
-				pathProcessed = true
-				break
-			}
-		}
-
-		if isIgnored(path, false) || "" == path || pathProcessed {
-			continue
-		}
-
-		processedPaths = append(processedPaths, path)
-
-		processChange(InitChangeType, path)
-	}
-
-	initCompleted = true
-}
+var synchronizer *Synchronizer
 
 func remove(s []string, i int) []string {
 	s[i] = s[len(s)-1]
@@ -414,9 +129,9 @@ func pool() {
 						}
 
 						if (alphaExists && !betaExists) || (betaExists && !alphaExists) {
-							processChange(RemoveChangeType, p)
+							synchronizer.ProcessEvent(RemoveChangeType, p)
 						} else {
-							processChange(ModifyChangeType, p)
+							synchronizer.ProcessEvent(RemoveChangeType, p)
 						}
 					}
 				} else {
@@ -449,21 +164,21 @@ func initFsNotifyWatcher() {
 				if !ok {
 					return
 				}
-				if initCompleted {
+				if synchronizer.initCompleted {
 					log.Debugln("[fsnotify] event:", event)
 					log.Debugln("[fsnotify] event:", event.Op.String())
 					var path = strings.Replace(strings.Replace(event.Name, args.Alpha, "", 1), args.Beta, "", 1)
 
 					if strings.Index(event.Op.String(), "CREATE") >= 0 {
-						processChange(CreateChangeType, path)
+						synchronizer.ProcessEvent(CreateChangeType, path)
 					}
 
 					if strings.Index(event.Op.String(), "WRITE") >= 0 {
-						processChange(ModifyChangeType, path)
+						synchronizer.ProcessEvent(ModifyChangeType, path)
 					}
 
 					if strings.Index(event.Op.String(), "REMOVE") >= 0 {
-						processChange(RemoveChangeType, path)
+						synchronizer.ProcessEvent(RemoveChangeType, path)
 					}
 				}
 			case err, ok := <-watcher.Errors:
@@ -582,11 +297,7 @@ func main() {
 
 	log.Infoln(fmt.Sprintf("Starting sync from %s to %s With the following parameters: %#v", args.Alpha, args.Beta, args))
 
-	if args.InitDir {
-		initDir()
-	} else {
-		initCompleted = true
-	}
+	synchronizer = NewSynchronizer()
 
 	if args.PollEnabled {
 		pool()

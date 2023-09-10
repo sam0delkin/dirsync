@@ -3,7 +3,6 @@ package main
 import (
 	"github.com/gookit/goutil/arrutil"
 	"github.com/phf/go-queue/queue"
-	"github.com/cornelk/hashmap"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"os/exec"
@@ -59,13 +58,13 @@ func (q *Synchronizer) pool() {
 			case <-ticker.C:
 				q.mutex.Lock()
 				log.Debugln("[sync] Starting sync iteration")
-				var m :=  make(map[string]ChangeType)
+				var m =  make(map[string]ChangeType)
 				for true {
 					var item = q.queue.PopFront()
-					value = m[item.Path]
+					var value = m[item.(Event).Path]
 
-					if (value != nil) {
-						if (value == RemoveChangeType && item.Type != RemoveChangeType) {
+					if (value != 0) {
+						if (value == RemoveChangeType && item.(Event).Type != RemoveChangeType) {
 							q.processChange(item.(Event).Type, item.(Event).Path)
 						}
 

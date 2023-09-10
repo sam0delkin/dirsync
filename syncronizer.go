@@ -61,6 +61,11 @@ func (q *Synchronizer) pool() {
 				var m =  make(map[string]ChangeType)
 				for true {
 					var item = q.queue.PopFront()
+
+					if item == nil {
+						break
+					}
+
 					var value = m[item.(Event).Path]
 
 					if (value != 0) {
@@ -71,10 +76,7 @@ func (q *Synchronizer) pool() {
 						continue
 					}
 
-					if item == nil {
-						break
-					}
-
+					m[item.(Event).Path] = item.(Event).Type
 					q.processChange(item.(Event).Type, item.(Event).Path)
 				}
 				log.Debugln("[sync] All events processed")

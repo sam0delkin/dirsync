@@ -14,6 +14,7 @@ require (
 
 require (
 	github.com/alexflint/go-scalar v1.1.0 // indirect
+	github.com/cornelk/hashmap v1.0.8
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/opcoder0/capabilities v0.0.0-20221222060822-17fd73bffd2a // indirect
 	golang.org/x/text v0.8.0 // indirect
